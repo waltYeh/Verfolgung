@@ -1,3 +1,4 @@
+
 # Struck: Structured Output Tracking with Kernels
 
 
@@ -54,3 +55,7 @@ This code is released under the GPLv3 license for non-commercial use only. For o
 
 This code uses the OpenCV graphing utilities provided
 by Shervin Emami: http://www.shervinemami.info/graphs.html
+=======
+# Verfolgung
+der gleichzeitigen Verfolgung von (bewegten) Objekten dienen
+
