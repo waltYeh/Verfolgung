@@ -168,6 +168,15 @@ int main(int argc, char* argv[])
 	srand(conf.seed);
 	for (int frameInd = startFrame; frameInd <= endFrame; ++frameInd)
 	{
+		if(frameInd == 100){
+			cout << "now start" << endl;
+			doInitialise = true;
+		}else if(frameInd == 10)
+			cout << "3" <<endl;
+		else if(frameInd == 40)
+			cout << "2" <<endl;
+		else if(frameInd == 70)
+			cout << "1" <<endl;
 		Mat frame;
 		if (useCamera)
 		{
