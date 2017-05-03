@@ -17,8 +17,25 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  geometry_msgs
+  message_generation
+  genmsg
+  tf
 )
-
+add_message_files(
+  FILES
+  roi_input.msg
+  track_output.msg
+#  raw_ctrl_sp.msg
+#  trj_ctrl_sp.msg
+#  state_est.msg
+#  output.msg
+)
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+)
 catkin_package(
   INCLUDE_DIRS include
 #  LIBRARIES struck
@@ -43,5 +60,6 @@ add_executable(struck ${HEADERS} ${SRC})
 
 target_link_libraries(struck
     ${OpenCV_LIBS}
+    ${catkin_LIBRARIES}
 )
 

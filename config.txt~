@@ -17,8 +17,8 @@ sequenceBasePath = /home/walt/catkin_ws/src/struck/sequences
 
 # frame size for use during tracking.
 # the input image will be scaled to this size.
-frameWidth = 420
-frameHeight = 240
+frameWidth = 640
+frameHeight = 480
 
 # seed for random number generator.
 seed = 0
@@ -38,6 +38,6 @@ svmBudgetSize = 100
 #   kernel = gaussian/linear/intersection/chi2
 #   for kernel=gaussian, kernel-params is sigma
 # multiple features can be specified and will be combined
-#feature = haar gaussian 0.2
-feature = raw gaussian 0.1
+feature = haar gaussian 0.2
+#feature = raw gaussian 0.1
 #feature = histogram intersection
