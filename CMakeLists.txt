@@ -19,6 +19,9 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
   message_generation
+  sensor_msgs  
+ cv_bridge  
+ image_transport  
   genmsg
   tf
 )
@@ -38,6 +41,7 @@ generate_messages(
 )
 catkin_package(
   INCLUDE_DIRS include
+
 #  LIBRARIES struck
 #  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
