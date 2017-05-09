@@ -29,7 +29,6 @@ private:
 	static const int kLiveBoxHeight = 100;
 	FloatRect initBB;
 	FloatRect inputBB;
-	Mat frameOrig;
 	bool statusRunning;
 	bool doInitialise;
 	bool paused;
@@ -44,13 +43,14 @@ private:
 public:
 	StruckTrack(ros::NodeHandle& nh, const string& configPath);
 	~StruckTrack();
-	void process(void);
-
+	void process(cv::Mat frameOrig);
 	void inputCallback(const struck::roi_input msg)
 	{
-		if(!statusRunning){
-			initBB = IntRect(msg.pose1.x, msg.pose1.y, msg.pose2.x - msg.pose1.x, msg.pose2.y - msg.pose1.y);
-			inputBB = IntRect(msg.pose1.x, msg.pose1.y, msg.pose2.x - msg.pose1.x, msg.pose2.y - msg.pose1.y);
+		static int cnt=0;
+		cnt++;
+		if(!statusRunning&&cnt>20){
+			initBB = IntRect(msg.pose1.x-160, msg.pose1.y+30, (msg.pose2.x - msg.pose1.x)*0.7, (msg.pose2.y - msg.pose1.y)*0.7);
+			inputBB = IntRect(msg.pose1.x-160, msg.pose1.y+30, (msg.pose2.x - msg.pose1.x)*0.7, (msg.pose2.y - msg.pose1.y)*0.7);
 			doInitialise = true;
 			statusRunning = true;
 		}
@@ -58,23 +58,20 @@ public:
 			inputBB = IntRect(msg.pose1.x, msg.pose1.y, msg.pose2.x - msg.pose1.x, msg.pose2.y - msg.pose1.y);
 		}
 	}
-
 	void imageCallback(const sensor_msgs::ImageConstPtr& tem_msg) 
 	{ 
 		cout<<"frame"<<endl; 
 		cv_bridge::CvImagePtr cv_ptr;
-		try    
-		{       
+		try{       
 		     cv_ptr = cv_bridge::toCvCopy(tem_msg, enc::BGR8); 
 		     cv::waitKey(1);
 		}    
-		catch (cv_bridge::Exception& e)    
-		{    
-		  ROS_ERROR("Could not convert from '%s' to 'mono8'.", tem_msg->encoding.c_str());        
+		catch (cv_bridge::Exception& e)    {
+			ROS_ERROR("Could not convert from '%s' to 'mono8'.", tem_msg->encoding.c_str());        
 		}
-		frameOrig = cv_ptr->image.clone();
+	//	frameOrig = cv_ptr->image.clone();
 		cout<<"frame"<<endl;
-		process();
+		process(cv_ptr->image);
 	} 
 
 };
@@ -87,21 +84,20 @@ StruckTrack::StruckTrack(ros::NodeHandle& nh, const string& configPath)
 ,paused(false)
 ,it(nh)
 {
-//	cout<<conf;
 	srand(conf.seed);
-	output_pub = nh.advertise<struck::track_output>("output",5);
-	input_sub = nh.subscribe("input",5,&StruckTrack::inputCallback,this);
-	sub = it.subscribe("/version1/node_a",1,&StruckTrack::imageCallback,this);
+	output_pub = nh.advertise<struck::track_output>("track_output",5);
+	input_sub = nh.subscribe("figure_roi",5,&StruckTrack::inputCallback,this);
+	sub = it.subscribe("node_a",1,&StruckTrack::imageCallback,this);
 
-	initBB = IntRect(290, 140, 40, 60);
-	doInitialise = true;
-	statusRunning = true;
+//	initBB = IntRect(290, 140, 40, 60);
+//	doInitialise = true;
+//	statusRunning = true;
 }
 StruckTrack::~StruckTrack()
 {
 
 }
-void StruckTrack::process(void)
+void StruckTrack::process(cv::Mat frameOrig)
 {
 	float scaleW = 1.f;
 	float scaleH = 1.f;
@@ -109,24 +105,19 @@ void StruckTrack::process(void)
 	resize(frameOrig, frame, Size(conf.frameWidth, conf.frameHeight));
 	flip(frame, frame, 1);
 	frame.copyTo(result);
-	if (doInitialise)
-	{
-		if (tracker.IsInitialised())
-		{
+	if (doInitialise){
+		if (tracker.IsInitialised()){
 			tracker.Reset();
 		}
-		else
-		{
+		else{
 			tracker.Initialise(frame, initBB);
 		}
 		doInitialise = false;
 	}
-	else if (!tracker.IsInitialised())
-	{
+	else if (!tracker.IsInitialised()){
 		myrectangle(result, initBB, CV_RGB(255, 255, 255));
 	}
-	if (tracker.IsInitialised())
-	{
+	if (tracker.IsInitialised()){
 		tracker.Track(frame);
 		if (!conf.quietMode && conf.debugMode)
 		{
@@ -134,8 +125,7 @@ void StruckTrack::process(void)
 		}	
 		myrectangle(result, tracker.GetBB(), CV_RGB(0, 255, 0));
 	}
-	if (!conf.quietMode)
-	{
+	if (!conf.quietMode){
 		imshow("result", result);
 		int key = waitKey(paused ? 0 : 1);
 	}
@@ -158,9 +148,7 @@ int main(int argc, char* argv[])
 	ros::init(argc, argv, "simcontroller");
 	ros::NodeHandle nh;
 	StruckTrack st(nh,configPath);
-
 	ros::Rate loop_rate(20);
-
 	while (ros::ok()){
 		ros::spinOnce();
 		loop_rate.sleep();
