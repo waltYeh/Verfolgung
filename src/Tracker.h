@@ -50,7 +50,16 @@ public:
 	void Reset();
 	void Track(const cv::Mat& frame);
 	void Debug();
-	
+	inline void CorrectBB(float x, float y){
+		m_bb.SetXMin(x);
+		m_bb.SetYMin(y);
+	}
+	inline float get_bb_x(){
+		return m_bb.XMin();
+	}
+	inline float get_bb_y(){
+		return m_bb.YMin();
+	}
 	inline const FloatRect& GetBB() const { return m_bb; }
 	inline bool IsInitialised() const { return m_initialised; }
 	

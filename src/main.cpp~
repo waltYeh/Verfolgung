@@ -1,3 +1,4 @@
+
 #include "ros/ros.h"
 #include "image_transport/image_transport.h"  
 #include "sensor_msgs/image_encodings.h" 
@@ -16,12 +17,6 @@
 namespace enc = sensor_msgs::image_encodings;
 using namespace std;
 using namespace cv;
-
-void inertial_filter_correct(float e, float dt, float *x, float w)
-{
-	float ewdt = e * w * dt;
-	*x += ewdt;
-}
 void myrectangle(Mat& rMat, const FloatRect& rRect, const Scalar& rColour)
 {
 	IntRect r(rRect);
@@ -37,18 +32,14 @@ private:
 	bool statusRunning;
 	bool doInitialise;
 	bool paused;
-	int width;
-	int length;
 	string configPath;
 	Config conf;
+	Mat result;
 	Tracker tracker;
 	ros::Publisher output_pub;
 	ros::Subscriber input_sub;
 	image_transport::ImageTransport it;
 	image_transport::Subscriber sub;
-//	float bb_bias[2];
-	float bias_corr_w;
-	float fig_dtct_w;
 public:
 	StruckTrack(ros::NodeHandle& nh, const string& configPath);
 	~StruckTrack();
@@ -58,40 +49,14 @@ public:
 		static int cnt=0;
 		cnt++;
 		if(!statusRunning){
-			if(msg.pose2.x - msg.pose1.x > 0 && msg.pose2.y - msg.pose1.y > 0){
-				if(msg.pose1.x >= 0 && msg.pose2.x <= width){
-					if (msg.pose1.y >= 0){
-						int rahm_w = msg.pose2.x - msg.pose1.x;
-						int rahm_h = msg.pose2.y - msg.pose1.y;
-						initBB = IntRect(msg.pose1.x+0.2*rahm_w, msg.pose1.y+0.2*rahm_h, rahm_w*0.6, rahm_h*0.6);
-						//inputBB = IntRect(msg.pose1.x, msg.pose1.y, (msg.pose2.x - msg.pose1.x), (msg.pose2.y - msg.pose1.y));
-						doInitialise = true;
-						statusRunning = true;
-					}
-				}
-			}
+			initBB = IntRect(msg.pose1.x, msg.pose1.y, (msg.pose2.x - msg.pose1.x), (msg.pose2.y - msg.pose1.y));
+			inputBB = IntRect(msg.pose1.x, msg.pose1.y, (msg.pose2.x - msg.pose1.x), (msg.pose2.y - msg.pose1.y));
+			doInitialise = true;
+			statusRunning = true;
 		}
 		else{
-			int rahm_w = msg.pose2.x - msg.pose1.x;
-			int rahm_h = msg.pose2.y - msg.pose1.y;
-			float fig_x = msg.pose1.x+0.2*rahm_w;
-			float fig_y = msg.pose1.y+0.2*rahm_h;
-			float track_x = tracker.get_bb_x();
-			float track_y = tracker.get_bb_y();
-		//	tracker.GetBB();
-			float corr_x = fig_x - track_x;
-			float corr_y = fig_y - track_y;
-			float bias_x = -corr_x * fig_dtct_w * fig_dtct_w;
-			float bias_y = -corr_y * fig_dtct_w * fig_dtct_w;
-			inertial_filter_correct(corr_x, 0.05, &track_x, fig_dtct_w); 
-			inertial_filter_correct(corr_y, 0.05, &track_y, fig_dtct_w);
-		//	bb_bias[0] += bias_x * 0.05 * bias_corr_w;
-		//	bb_bias[1] += bias_y * 0.05 * bias_corr_w;
-			tracker.CorrectBB(track_x, track_y);
 			inputBB = IntRect(msg.pose1.x, msg.pose1.y, msg.pose2.x - msg.pose1.x, msg.pose2.y - msg.pose1.y);
-//			myrectangle(result, tracker.GetBB(), CV_RGB(0, 255, 0));
 		}
-
 	}
 	void imageCallback(const sensor_msgs::ImageConstPtr& tem_msg) 
 	{ 
@@ -106,8 +71,6 @@ public:
 		}
 	//	frameOrig = cv_ptr->image.clone();
 		cout<<"frame"<<endl;
-		width = cv_ptr->image.cols;
-		length = cv_ptr->image.rows;
 		process(cv_ptr->image);
 	} 
 
@@ -115,7 +78,7 @@ public:
 StruckTrack::StruckTrack(ros::NodeHandle& nh, const string& configPath)
 :conf(configPath)
 ,tracker(conf)
-
+,result(conf.frameHeight, conf.frameWidth, CV_8UC3)
 ,statusRunning(false)
 ,doInitialise(false)
 ,paused(false)
@@ -125,9 +88,7 @@ StruckTrack::StruckTrack(ros::NodeHandle& nh, const string& configPath)
 	output_pub = nh.advertise<struck::track_output>("track_output",5);
 	input_sub = nh.subscribe("figure_roi",5,&StruckTrack::inputCallback,this);
 	sub = it.subscribe("node_a",1,&StruckTrack::imageCallback,this);
-//	bb_bias[0] = 0;
-	bias_corr_w = 0.15f;
-	fig_dtct_w = 2.0f;
+
 //	initBB = IntRect(290, 140, 40, 60);
 //	doInitialise = true;
 //	statusRunning = true;
@@ -136,14 +97,13 @@ StruckTrack::~StruckTrack()
 {
 
 }
-void StruckTrack::process(cv::Mat frame)
+void StruckTrack::process(cv::Mat frameOrig)
 {
 	float scaleW = 1.f;
 	float scaleH = 1.f;
-//	Mat frame;
-//	resize(frameOrig, frame, Size(width, length));
-//	flip(frame, frame, 1);
-	Mat result(length, width, CV_8UC3);
+	Mat frame;
+	resize(frameOrig, frame, Size(conf.frameWidth, conf.frameHeight));
+	flip(frame, frame, 1);
 	frame.copyTo(result);
 	if (doInitialise){
 		if (tracker.IsInitialised()){
@@ -164,7 +124,6 @@ void StruckTrack::process(cv::Mat frame)
 			tracker.Debug();
 		}	
 		myrectangle(result, tracker.GetBB(), CV_RGB(0, 255, 0));
-		myrectangle(result, inputBB, CV_RGB(255, 255, 255));
 	}
 	if (!conf.quietMode){
 		imshow("result", result);
