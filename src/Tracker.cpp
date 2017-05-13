@@ -209,7 +209,7 @@ void Tracker::UpdateDebugImage(const vector<FloatRect>& samples, const FloatRect
 
 void Tracker::Debug()
 {
-	imshow("tracker", m_debugImage);
+//	imshow("tracker", m_debugImage);
 	m_pLearner->Debug();
 }
 

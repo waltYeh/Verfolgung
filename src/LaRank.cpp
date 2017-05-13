@@ -461,7 +461,7 @@ void LaRank::Debug()
 {
 	cout << m_sps.size() << "/" << m_svs.size() << " support patterns/vectors" << endl;
 	UpdateDebugImage();
-	imshow("learner", m_debugImage);
+//	imshow("learner", m_debugImage);
 }
 
 void LaRank::UpdateDebugImage()

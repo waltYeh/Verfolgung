@@ -3,6 +3,7 @@
 #include "sensor_msgs/image_encodings.h" 
 #include <struck/roi_input.h>
 #include <struck/track_output.h>
+#include <controls/pose.h>
 #include <cv_bridge/cv_bridge.h>
 
 #include "Tracker.h"
@@ -37,8 +38,9 @@ private:
 	bool statusRunning;
 	bool doInitialise;
 	bool paused;
-	int width;
-	int length;
+	int fullwidth;
+	int fullheight;
+	float figurheight;
 	string configPath;
 	Config conf;
 	Tracker tracker;
@@ -59,11 +61,15 @@ public:
 		cnt++;
 		if(!statusRunning){
 			if(msg.pose2.x - msg.pose1.x > 0 && msg.pose2.y - msg.pose1.y > 0){
-				if(msg.pose1.x >= 0 && msg.pose2.x <= width){
-					if (msg.pose1.y >= 0){
-						int rahm_w = msg.pose2.x - msg.pose1.x;
-						int rahm_h = msg.pose2.y - msg.pose1.y;
-						initBB = IntRect(msg.pose1.x+0.2*rahm_w, msg.pose1.y+0.2*rahm_h, rahm_w*0.6, rahm_h*0.6);
+				if(fullwidth!=0&&fullheight!=0){
+					if(msg.pose1.y >= 0&&msg.pose1.x >= 0 && msg.pose2.x <= fullwidth){
+						int pose1x_val = msg.pose1.x * fullwidth;
+						int pose1y_val = msg.pose1.y * fullheight;
+						int pose2x_val = msg.pose2.x * fullwidth;
+						int pose2y_val = msg.pose2.y * fullheight;
+						int rahm_w = pose2x_val - pose1x_val;
+						int rahm_h = pose2y_val - pose1y_val;
+						initBB = IntRect(pose1x_val+0.2*rahm_w, pose1y_val+0.2*rahm_h, rahm_w*0.6, rahm_h*0.6);
 						//inputBB = IntRect(msg.pose1.x, msg.pose1.y, (msg.pose2.x - msg.pose1.x), (msg.pose2.y - msg.pose1.y));
 						doInitialise = true;
 						statusRunning = true;
@@ -72,10 +78,15 @@ public:
 			}
 		}
 		else{
-			int rahm_w = msg.pose2.x - msg.pose1.x;
-			int rahm_h = msg.pose2.y - msg.pose1.y;
-			float fig_x = msg.pose1.x+0.2*rahm_w;
-			float fig_y = msg.pose1.y+0.2*rahm_h;
+			int pose1x_val = msg.pose1.x * fullwidth;
+			int pose1y_val = msg.pose1.y * fullheight;
+			int pose2x_val = msg.pose2.x * fullwidth;
+			int pose2y_val = msg.pose2.y * fullheight;
+			int rahm_w = pose2x_val - pose1x_val;
+			int rahm_h = pose2y_val - pose1y_val;
+			figurheight = msg.pose2.y - msg.pose1.y;
+			float fig_x = pose1x_val+0.2*rahm_w;
+			float fig_y = pose1y_val+0.2*rahm_h;
 			float track_x = tracker.get_bb_x();
 			float track_y = tracker.get_bb_y();
 		//	tracker.GetBB();
@@ -88,7 +99,7 @@ public:
 		//	bb_bias[0] += bias_x * 0.05 * bias_corr_w;
 		//	bb_bias[1] += bias_y * 0.05 * bias_corr_w;
 			tracker.CorrectBB(track_x, track_y);
-			inputBB = IntRect(msg.pose1.x, msg.pose1.y, msg.pose2.x - msg.pose1.x, msg.pose2.y - msg.pose1.y);
+			inputBB = IntRect(pose1x_val, pose1y_val, pose2x_val - pose1x_val, pose2y_val - pose1y_val);
 //			myrectangle(result, tracker.GetBB(), CV_RGB(0, 255, 0));
 		}
 
@@ -106,8 +117,8 @@ public:
 		}
 	//	frameOrig = cv_ptr->image.clone();
 		cout<<"frame"<<endl;
-		width = cv_ptr->image.cols;
-		length = cv_ptr->image.rows;
+		fullwidth = cv_ptr->image.cols;
+		fullheight = cv_ptr->image.rows;
 		process(cv_ptr->image);
 	} 
 
@@ -115,7 +126,6 @@ public:
 StruckTrack::StruckTrack(ros::NodeHandle& nh, const string& configPath)
 :conf(configPath)
 ,tracker(conf)
-
 ,statusRunning(false)
 ,doInitialise(false)
 ,paused(false)
@@ -141,9 +151,9 @@ void StruckTrack::process(cv::Mat frame)
 	float scaleW = 1.f;
 	float scaleH = 1.f;
 //	Mat frame;
-//	resize(frameOrig, frame, Size(width, length));
+//	resize(frameOrig, frame, Size(fullwidth, fullheight));
 //	flip(frame, frame, 1);
-	Mat result(length, width, CV_8UC3);
+	Mat result(fullheight, fullwidth, CV_8UC3);
 	frame.copyTo(result);
 	if (doInitialise){
 		if (tracker.IsInitialised()){
@@ -167,17 +177,18 @@ void StruckTrack::process(cv::Mat frame)
 		myrectangle(result, inputBB, CV_RGB(255, 255, 255));
 	}
 	if (!conf.quietMode){
-		imshow("result", result);
-		int key = waitKey(paused ? 0 : 1);
+		//imshow("result", result);
+		//int key = waitKey(paused ? 0 : 1);
 	}
 	struck::track_output output_msg;
 	const FloatRect& bb = tracker.GetBB();
-	output_msg.pose1.x = bb.XMin()/scaleW;
-	output_msg.pose1.y = bb.YMin()/scaleH;
-	output_msg.pose2.x = bb.XMin()/scaleW+bb.Width()/scaleW;
-	output_msg.pose2.y = bb.YMin()/scaleH+bb.Height()/scaleH;
+	output_msg.pose1.x = bb.XMin()/(float)fullwidth;
+	output_msg.pose1.y = bb.YMin()/(float)fullheight;
+	output_msg.pose2.x = (bb.XMin()+bb.Width())/(float)fullwidth;
+	output_msg.pose2.y = (bb.YMin()+bb.Height())/(float)fullheight;
 	output_msg.vel.x = 0;
 	output_msg.vel.y = 0;
+	output_msg.height = figurheight;
 	output_pub.publish(output_msg);
 }
 
@@ -185,7 +196,8 @@ void StruckTrack::process(cv::Mat frame)
 int main(int argc, char* argv[])
 {
 	string configPath = argv[1];
-	cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
+
+//	cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
 	ros::init(argc, argv, "simcontroller");
 	ros::NodeHandle nh;
 	StruckTrack st(nh,configPath);
