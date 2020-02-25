@@ -3,7 +3,7 @@
 #include "sensor_msgs/image_encodings.h" 
 #include <struck/roi_input.h>
 #include <struck/track_output.h>
-#include <controls/pose.h>
+
 #include <cv_bridge/cv_bridge.h>
 
 #include "Tracker.h"
@@ -12,7 +12,7 @@
 #include <iostream>
 #include <fstream>
 
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include <opencv/highgui.h>
 namespace enc = sensor_msgs::image_encodings;
 using namespace std;
